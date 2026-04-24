@@ -1,0 +1,82 @@
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+byte c_[8] = {0b00000, 0b00000, 0b01110, 0b10000, 0b10000, 0b10001, 0b01110, 0b00100}; // ç +
+byte C_[8] = {0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110, 0b00100}; // Ç +
+byte g_[8] = {0b01110, 0b00000, 0b01111, 0b10001, 0b01111, 0b00001, 0b01110, 0b00000}; // ğ 
+byte G_[8] = {0b01110, 0b00000, 0b01111, 0b10000, 0b10111, 0b10001, 0b01111, 0b00000}; // Ğ 
+byte i_[8] = {0b00000, 0b00000, 0b01100, 0b00100, 0b00100, 0b00100, 0b01110, 0b00000}; // ı +
+byte I_[8] = {0b00100, 0b00000, 0b01110, 0b00100, 0b00100, 0b00100, 0b01110, 0b00000}; // İ
+byte s_[8] = {0b00000, 0b00000, 0b01110, 0b10000, 0b01110, 0b00001, 0b11110, 0b00100}; // ş +
+byte S_[8] = {0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110, 0b00100}; // Ş +
+
+struct TurkishChars {
+  String letter;
+  byte* bitmap;
+};
+
+TurkishChars charList[8] = {
+  {"ç", c_}, {"Ç", C_}, {"ğ", g_}, {"Ğ", G_}, 
+  {"ş", s_}, {"Ş", S_}, {"ı", i_}, {"İ", I_}
+};
+
+String testString = "öfhdfddsüafğdsf";
+bool scrolling = true;
+bool scrollDirection = true; // true = left, false = right
+int scrollSpeed = 100;
+int currentIndex = 0;
+
+void setup() {
+  lcd.init();
+  lcd.backlight();
+  while (testString.length() % 16 != 0) {testString += " ";}
+  if (testString.length() == 16){scrolling = false;}
+  for (int i = 0; i < 8; i++) {lcd.createChar(i, charList[i].bitmap);}
+  lcd.setCursor(0, 0);
+  printLetter(testString.substring(0, 16));
+}
+
+void loop() {
+  if (scrolling) {
+    if (scrollDirection) {
+      currentIndex++;
+      if (currentIndex > testString.length() - 16) {currentIndex = 0;}
+    }
+    else {
+      currentIndex--;
+      if (currentIndex < 0) {currentIndex = testString.length() - 16;}
+    }
+    lcd.setCursor(0, 0);
+    printLetter(testString.substring(currentIndex, currentIndex + 16));
+    delay(scrollSpeed);
+  }
+}
+
+void printLetter(String part){
+  for (int i = 0; i < part.length(); i++){
+    String current = "";
+    uint8_t currentLetter = (uint8_t)part[i];
+    if ((currentLetter & 0xE0) == 0xC0) {
+      current = part.substring(i, i+2);
+      i++;
+    }
+    else {
+      current = part.substring(i, i+1);
+    }
+    int foundSlot =-1;
+    for (int j = 0; j < 8; j++){
+      if (current == charList[j].letter){
+        foundSlot = j;
+        break;
+      }
+    }
+    if (foundSlot != -1){lcd.write(foundSlot);}
+    else if (current == "ö") {lcd.write(0xEF);}
+    else if (current == "Ö") {lcd.write(0xEF);}
+    else if (current == "ü") {lcd.write(0xF5);}
+    else if (current == "Ü") {lcd.write(0xF5);}
+    else if (currentLetter < 128){lcd.write(currentLetter);}
+  }
+}
