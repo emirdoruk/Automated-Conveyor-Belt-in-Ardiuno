@@ -1,0 +1,101 @@
+// PRJ1 - LCD IMPLEMENTATION
+// In this system, the LCD serves as the visual interface for the operator.
+// Its main purpose is to provide real-time data monitoring by displaying the status of the operation, such as the initial startup sequence and the live count of sorted objects.
+// By showing "Object1" and "Object2" counters on the screen, it allows for seamless tracking of the system's productivity.
+
+// PRJ2 - MOTOR IMPLEMENTATION
+// In this system, the DC motor acts as the primary actuator, driving the conveyor belt to transport objects for sorting.
+// The L293D motor controller is utilized to safely manage the motor's voltage and directional control, bridging the Arduino logic with the high-power requirements of the motor.
+// The system's control logic relies on input triggers from the ultrasonic sensor; specifically, the DC motor halts when an object is detected within sorting range.
+// Once the belt stops, the Servo motor is activated as the secondary actuator to perform the sorting task by moving to a specific angle based on a random selection.
+// After the sorting arm clears the object, the DC motor resumes operation, ensuring a seamless interaction between sensing, motor movement, and servo-based sorting.
+
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <Servo.h>
+#include <DCMotor.h>
+
+// Component Initializations
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo servo;
+// DC Motor/L293D Pin Configuration
+const int speedPin = 10;
+const int forwardPin = 9;
+const int backwardPin = 8;
+// Sensor and Servo Pins
+const int servoPin = 7;
+const int echoPin = 6;
+const int trigPin = 5;
+// Global Variables
+int distance;
+int counter1 = 0;
+int counter2 = 0;
+int selection;
+
+void setup() {
+  // Motor Pins must be set as OUTPUT to send signals to the L293D
+  pinMode(speedPin, OUTPUT);
+  pinMode(forwardPin, OUTPUT);
+  pinMode(backwardPin, OUTPUT);
+  // Ultrasonic Sensor Pin Configuration
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  digitalWrite(backwardPin, LOW); // Backward is disabled for this conveyor application. 
+  lcd.init();
+  lcd.backlight();
+  Serial.begin(9600);
+  // Setup position for servo (90 degree)
+  servo.attach(servoPin);
+  servo.write(90); 
+  // Display system start-up message on LCD
+  lcd.setCursor(0, 0);
+  lcd.print("System Starting...");
+  delay(5000);
+  lcd.clear();
+  screenDisplay();
+}
+
+void loop() {
+  selection = random(1,3); 
+  distance = calcDistance(); // Constantly monitor distance to detect objects.
+  // Control Logic: The motor operates based on the distance input signal.
+  if (distance > 5 || distance == 0){
+    digitalWrite(forwardPin, HIGH);
+    analogWrite(speedPin, 255);
+  } // If no object is detected within given centimeters, the DC motor starts/continues to run.
+  else{
+    digitalWrite(forwardPin, LOW);
+    analogWrite(speedPin, 0);
+    if (selection == 1){action(counter1, 180);}
+    else{action(counter2, 0);}
+  } // If an object is detected, the DC motor stops for sorting.
+}
+
+void action(int &counter, int servoAngle){
+    counter++;
+    screenDisplay();
+    servo.write(servoAngle);
+    delay(5000);
+    servo.write(90);
+    delay(1000);
+} // For selected action update the LCD screen, move to arm of servo to given angle, and wait 5 second. Then return servo to 90 degree.
+
+void screenDisplay(){
+  lcd.setCursor(0,0);
+  lcd.print("Object1: ");
+  lcd.print(counter1);
+  lcd.setCursor(0,1);
+  lcd.print("Object2: ");
+  lcd.print(counter2);
+  lcd.setCursor(15,0);
+  lcd.print(selection);
+} // Display counter for object1 on first line, counter for object2 on second line, and current action selected with random on upper right corner.
+
+int calcDistance(){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  return pulseIn(echoPin, HIGH) * 0.034 / 2;
+} // Calculate the distance from the ultrasonic sensor in centimeters.
